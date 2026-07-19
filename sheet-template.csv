@@ -1,0 +1,5 @@
+Course Code,Course Title,Question Number,Question,Answer,Access
+MTH101,Linear Algebra,1,"Solve for x: 2x + 5 = 15","x = 5. Subtract 5 from both sides to get 2x = 10, then divide both sides by 2.",Free
+MTH101,Linear Algebra,2,"Find the determinant of [[2,1],[3,4]]","det = (2*4) - (1*3) = 8 - 3 = 5",Paid
+CHM101,General Chemistry,1,"State the law of conservation of mass","Matter can neither be created nor destroyed in a chemical reaction; the mass of reactants equals the mass of products.",Free
+CHM101,General Chemistry,2,"Balance the equation: H2 + O2 -> H2O","2H2 + O2 -> 2H2O",Paid
