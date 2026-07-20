@@ -143,6 +143,8 @@
     font-size:0.95rem;
     margin-bottom:14px;
     white-space:pre-wrap;
+    overflow-wrap:anywhere;
+    line-height:1.55;
   }
   .qa-card hr{
     border:none;
@@ -158,6 +160,21 @@
   .qa-card .a-text{
     font-size:0.95rem;
     white-space:pre-wrap;
+    overflow-wrap:anywhere;
+    line-height:1.6;
+  }
+  .qa-card .calc-block{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:0.82rem;
+    line-height:1.5;
+    white-space:pre;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    background:rgba(28,60,51,0.06);
+    border:1px solid rgba(28,60,51,0.12);
+    border-radius:8px;
+    padding:12px 14px;
+    margin-top:2px;
   }
   .stamp{
     position:absolute;
@@ -260,6 +277,8 @@
    Expected columns (header row, any order, case-insensitive):
       Course Code | Course Title | Question Number | Question | Answer
    ("Answer" can also be named "Solution" or "Solutions").
+   Optional: add an "Exam Year" column (e.g. 2021, 2022/2023) — if present,
+   the app will ask students which year they want after they pick a course.
    ===================================================================== */
 const SHEET_ID   = "1NfsM5LmFbKALtXGmAt-PFilMKcKp4bijEWOJlA3ey3A";
 const SHEET_NAME = "Sheet1";
@@ -283,6 +302,9 @@ let state = 'loading'; // loading -> name -> course -> qnum -> next
 let studentName = '';
 let currentCourseRows = [];
 let currentCourseLabel = '';
+let currentSearchRows = [];   // rows to search question numbers within (course, optionally filtered by year)
+let currentYearLabel = '';
+let hasYearColumn = false;
 let unlockedPaid = false;
 let pendingPaidRow = null;
 
@@ -328,17 +350,25 @@ function addChips(labels, onClick){
   chatLog.appendChild(wrap);
   scrollDown();
 }
+function looksTabular(text){
+  const t = String(text || '');
+  return t.includes('\t') || /( {2,}\S.*\n){2,}/.test(t) || /\n {2,}/.test(t);
+}
 function addQACard(row){
   const card = document.createElement('div');
   card.className = 'qa-card';
+  const yearBit = row.year ? ` · ${escapeHtml(row.year)}` : '';
+  const answerHtml = looksTabular(row.answer)
+    ? `<pre class="calc-block">${escapeHtml(row.answer)}</pre>`
+    : `<div class="a-text">${escapeHtml(row.answer)}</div>`;
   card.innerHTML = `
     <div class="stamp">✓ found</div>
-    <div class="code">${escapeHtml(row.courseCode)} · Q${escapeHtml(row.qNumber)}</div>
+    <div class="code">${escapeHtml(row.courseCode)} · Q${escapeHtml(row.qNumber)}${yearBit}</div>
     <div class="q-label">Question</div>
     <div class="q-text">${escapeHtml(row.question)}</div>
     <hr>
     <div class="a-label">Answer</div>
-    <div class="a-text">${escapeHtml(row.answer)}</div>
+    ${answerHtml}
   `;
   chatLog.appendChild(card);
   scrollDown();
@@ -395,6 +425,7 @@ async function loadBank(){
     const qIdx     = findCol(headers, ['question','question text']);
     const aIdx     = findCol(headers, ['answer','solution','solutions','answers']);
     const accessIdx = findCol(headers, ['access','tier','plan']);
+    const yearIdx = findCol(headers, ['exam year','year','session','exam session']);
 
     if(codeIdx === -1 && titleIdx === -1){
       throw new Error('Missing Course Code / Course Title column');
@@ -406,8 +437,11 @@ async function loadBank(){
       qNumber: qnumIdx!==-1 ? String(row[headers[qnumIdx]]||'').trim() : '',
       question: qIdx!==-1 ? row[headers[qIdx]] : '',
       answer: aIdx!==-1 ? row[headers[aIdx]] : '',
-      access: accessIdx!==-1 ? String(row[headers[accessIdx]]||'').trim().toLowerCase() : 'free'
+      access: accessIdx!==-1 ? String(row[headers[accessIdx]]||'').trim().toLowerCase() : 'free',
+      year: yearIdx!==-1 ? String(row[headers[yearIdx]]||'').trim() : ''
     })).filter(r => r.courseCode || r.courseTitle);
+
+    hasYearColumn = bank.some(r => r.year);
 
     removeTyping();
     if(!bank.length){
@@ -487,9 +521,47 @@ function selectCourse(codeOrTitle){
     return;
   }
   currentCourseLabel = `${currentCourseRows[0].courseCode || ''}${currentCourseRows[0].courseTitle ? ' – ' + currentCourseRows[0].courseTitle : ''}`;
-  const numbers = currentCourseRows.map(r => r.qNumber).filter(Boolean);
+
+  if(hasYearColumn){
+    askYear();
+  }else{
+    askQuestionNumber(currentCourseRows);
+  }
+}
+
+function availableYears(){
+  return [...new Set(currentCourseRows.map(r => r.year).filter(Boolean))]
+    .sort((a,b)=> b.localeCompare(a, undefined, {numeric:true}));
+}
+
+function askYear(){
+  state = 'year';
+  const years = availableYears();
+  addBotMessage(`Great, ${currentCourseLabel}. Which exam year would you like to practice?`);
+  if(years.length) addChips(years.slice(0, 20), (label)=>{
+    addUserMessage(label);
+    handleYearInput(label);
+  });
+  setInputEnabled(true, "e.g. 2023");
+}
+
+function handleYearInput(text){
+  const q = text.trim().toLowerCase();
+  const rows = currentCourseRows.filter(r => r.year.toLowerCase() === q || r.year.toLowerCase().includes(q));
+  if(!rows.length){
+    const years = availableYears().join(', ');
+    addBotMessage(`I couldn't find ${text} for ${currentCourseLabel}. Available years: ${years || '(none listed yet)'}`);
+    return;
+  }
+  currentYearLabel = text.trim();
+  askQuestionNumber(rows);
+}
+
+function askQuestionNumber(rows){
+  currentSearchRows = rows;
+  const numbers = rows.map(r => r.qNumber).filter(Boolean);
   state = 'qnum';
-  addBotMessage(`Great, ${currentCourseLabel}. Which question number would you like to practice?`);
+  addBotMessage(`Which question number would you like to practice?`);
   if(numbers.length) addChips(numbers.slice(0, 20), (label)=>{
     addUserMessage(label);
     handleQuestionNumberInput(label);
@@ -499,10 +571,10 @@ function selectCourse(codeOrTitle){
 
 function handleQuestionNumberInput(text){
   const q = text.trim().toLowerCase().replace(/[^a-z0-9]/g,'');
-  const found = currentCourseRows.find(r => r.qNumber.toLowerCase().replace(/[^a-z0-9]/g,'') === q);
+  const found = currentSearchRows.find(r => r.qNumber.toLowerCase().replace(/[^a-z0-9]/g,'') === q);
   if(!found){
-    const available = currentCourseRows.map(r=>r.qNumber).filter(Boolean).join(', ');
-    addBotMessage(`I couldn't find question ${text} for ${currentCourseLabel}. Available question numbers: ${available || '(none listed yet)'}`);
+    const available = currentSearchRows.map(r=>r.qNumber).filter(Boolean).join(', ');
+    addBotMessage(`I couldn't find question ${text}. Available question numbers: ${available || '(none listed yet)'}`);
     return;
   }
   const isPaid = found.access === 'paid' || found.access === 'premium';
@@ -522,13 +594,16 @@ function handleQuestionNumberInput(text){
 function showAnswer(found){
   addQACard(found);
   state = 'next';
-  addBotMessage("Want to try another question number from the same course, or study a different course?");
-  addChips(['Another question, same course', 'Different course'], (label)=>{
+  addBotMessage("What next?");
+  const options = ['Another question'];
+  if(hasYearColumn) options.push('Different year, same course');
+  options.push('Different course');
+  addChips(options, (label)=>{
     addUserMessage(label);
-    if(label.startsWith('Another')){
-      state = 'qnum';
-      addBotMessage(`Which question number for ${currentCourseLabel}?`);
-      setInputEnabled(true, "e.g. 4");
+    if(label === 'Another question'){
+      askQuestionNumber(currentSearchRows);
+    }else if(label.startsWith('Different year')){
+      askYear();
     }else{
       askCourse();
     }
@@ -570,6 +645,8 @@ form.addEventListener('submit', (e)=>{
     askCourse();
   }else if(state === 'course'){
     handleCourseInput(text);
+  }else if(state === 'year'){
+    handleYearInput(text);
   }else if(state === 'qnum'){
     handleQuestionNumberInput(text);
   }else if(state === 'paywall-email'){
@@ -581,11 +658,12 @@ form.addEventListener('submit', (e)=>{
     startPaystackCheckout(text);
   }else if(state === 'next'){
     const lower = text.toLowerCase();
-    if(lower.includes('different') || lower.includes('course')){
+    if(lower.includes('different') && lower.includes('year') && hasYearColumn){
+      askYear();
+    }else if(lower.includes('course')){
       askCourse();
     }else{
-      state = 'qnum';
-      addBotMessage(`Which question number for ${currentCourseLabel}?`);
+      askQuestionNumber(currentSearchRows);
     }
   }
 });
