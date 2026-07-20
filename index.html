@@ -203,6 +203,12 @@
     background:#8a9c92;
     border-radius:8px;
   }
+  .qa-card .a-para{
+    margin:0 0 12px 0;
+  }
+  .qa-card .a-para:last-child{
+    margin-bottom:0;
+  }
   .qa-card .calc-table{
     width:100%;
     border-collapse:collapse;
@@ -211,22 +217,14 @@
     margin-top:2px;
   }
   .qa-card .calc-table-wrap{
-    max-height:320px;
     overflow-x:auto;
-    overflow-y:auto;
     -webkit-overflow-scrolling:touch;
-    background-color:#F1EFE4;
-    background-image:
-      linear-gradient(#F1EFE4 30%, rgba(241,239,228,0)),
-      linear-gradient(rgba(241,239,228,0), #F1EFE4 70%),
-      radial-gradient(farthest-side at 50% 0, rgba(28,60,51,.25), rgba(28,60,51,0)),
-      radial-gradient(farthest-side at 50% 100%, rgba(28,60,51,.25), rgba(28,60,51,0));
-    background-repeat:no-repeat;
-    background-position:0 0, 0 100%, 0 0, 0 100%;
-    background-size:100% 24px, 100% 24px, 100% 10px, 100% 10px;
-    background-attachment:local, local, scroll, scroll;
     border:1px solid rgba(28,60,51,0.15);
     border-radius:8px;
+    margin-bottom:12px;
+  }
+  .qa-card .a-text > .calc-table-wrap:last-child{
+    margin-bottom:0;
   }
   .qa-card .calc-table th, .qa-card .calc-table td{
     border:1px solid rgba(28,60,51,0.15);
@@ -247,24 +245,16 @@
     font-size:0.82rem;
     line-height:1.5;
     white-space:pre;
-    max-height:320px;
     overflow-x:auto;
-    overflow-y:auto;
     -webkit-overflow-scrolling:touch;
-    background-color:#eae6d9;
-    background-image:
-      linear-gradient(#eae6d9 30%, rgba(234,230,217,0)),
-      linear-gradient(rgba(234,230,217,0), #eae6d9 70%),
-      radial-gradient(farthest-side at 50% 0, rgba(28,60,51,.25), rgba(28,60,51,0)),
-      radial-gradient(farthest-side at 50% 100%, rgba(28,60,51,.25), rgba(28,60,51,0));
-    background-repeat:no-repeat;
-    background-position:0 0, 0 100%, 0 0, 0 100%;
-    background-size:100% 24px, 100% 24px, 100% 10px, 100% 10px;
-    background-attachment:local, local, scroll, scroll;
+    background:#eae6d9;
     border:1px solid rgba(28,60,51,0.12);
     border-radius:8px;
     padding:12px 14px;
-    margin-top:2px;
+    margin-bottom:12px;
+  }
+  .qa-card .a-text > .calc-block:last-child{
+    margin-bottom:0;
   }
   .stamp{
     position:absolute;
@@ -454,24 +444,51 @@ function looksTabular(text){
   const t = String(text || '');
   return t.includes('\t') || /( {2,}\S.*\n){2,}/.test(t) || /\n {2,}/.test(t);
 }
-function parsePipeTable(text){
-  const lines = String(text || '').split('\n').map(l => l.trim()).filter(l => l.length);
-  const pipeLines = lines.filter(l => l.includes('|'));
-  if(pipeLines.length < 2) return null; // need at least a header + one row
-  const rows = pipeLines.map(l => l.split('|').map(c => c.trim()));
-  return rows;
+function splitAnswerSegments(text){
+  // Groups consecutive lines into 'table' segments (contain |) and 'text' segments (don't),
+  // preserving order so nothing is dropped — unlike a filter-only approach.
+  const lines = String(text || '').split('\n');
+  const segments = [];
+  let current = null;
+  for(const raw of lines){
+    const trimmed = raw.trim();
+    if(!trimmed){
+      if(current && current.type === 'text') current.lines.push('');
+      continue;
+    }
+    const isPipe = trimmed.includes('|');
+    const type = isPipe ? 'table' : 'text';
+    if(!current || current.type !== type){
+      current = { type, lines: [] };
+      segments.push(current);
+    }
+    current.lines.push(trimmed);
+  }
+  return segments;
 }
-function renderPipeTable(rows){
+function renderPipeTable(lines){
+  if(lines.length < 2) return null; // need a header + at least one row to count as a real table
+  const rows = lines.map(l => l.split('|').map(c => c.trim()));
   const [header, ...body] = rows;
   const thead = `<tr>${header.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>`;
   const tbody = body.map(r => `<tr>${r.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('');
   return `<div class="calc-table-wrap"><table class="calc-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
 }
 function renderAnswerBlock(text){
-  const tableRows = parsePipeTable(text);
-  if(tableRows) return renderPipeTable(tableRows);
-  if(looksTabular(text)) return `<pre class="calc-block">${escapeHtml(text)}</pre>`;
-  return `<div class="a-text">${escapeHtml(text)}</div>`;
+  const segments = splitAnswerSegments(text);
+  const parts = segments.map(seg => {
+    if(seg.type === 'table'){
+      const table = renderPipeTable(seg.lines);
+      if(table) return table;
+      // a lone '|' line isn't a real table — fall through and show it as text
+    }
+    const joined = seg.lines.join('\n').trim();
+    if(!joined) return '';
+    return looksTabular(joined)
+      ? `<pre class="calc-block">${escapeHtml(joined)}</pre>`
+      : `<p class="a-para">${escapeHtml(joined)}</p>`;
+  });
+  return `<div class="a-text">${parts.join('')}</div>`;
 }
 function addQACard(row){
   const card = document.createElement('div');
