@@ -168,6 +168,33 @@
     overflow-wrap:anywhere;
     line-height:1.6;
   }
+  .qa-card .calc-table{
+    width:100%;
+    border-collapse:collapse;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:0.82rem;
+    margin-top:2px;
+  }
+  .qa-card .calc-table-wrap{
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    border:1px solid rgba(28,60,51,0.15);
+    border-radius:8px;
+  }
+  .qa-card .calc-table th, .qa-card .calc-table td{
+    border:1px solid rgba(28,60,51,0.15);
+    padding:8px 10px;
+    text-align:left;
+    white-space:nowrap;
+  }
+  .qa-card .calc-table th{
+    background:rgba(28,60,51,0.08);
+    color:#1c3c33;
+    font-weight:600;
+  }
+  .qa-card .calc-table tr:nth-child(even) td{
+    background:rgba(28,60,51,0.03);
+  }
   .qa-card .calc-block{
     font-family:'IBM Plex Mono',monospace;
     font-size:0.82rem;
@@ -369,13 +396,29 @@ function looksTabular(text){
   const t = String(text || '');
   return t.includes('\t') || /( {2,}\S.*\n){2,}/.test(t) || /\n {2,}/.test(t);
 }
+function parsePipeTable(text){
+  const lines = String(text || '').split('\n').map(l => l.trim()).filter(l => l.length);
+  const pipeLines = lines.filter(l => l.includes('|'));
+  if(pipeLines.length < 2) return null; // need at least a header + one row
+  const rows = pipeLines.map(l => l.split('|').map(c => c.trim()));
+  return rows;
+}
+function renderPipeTable(rows){
+  const [header, ...body] = rows;
+  const thead = `<tr>${header.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>`;
+  const tbody = body.map(r => `<tr>${r.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('');
+  return `<div class="calc-table-wrap"><table class="calc-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
+}
+function renderAnswerBlock(text){
+  const tableRows = parsePipeTable(text);
+  if(tableRows) return renderPipeTable(tableRows);
+  if(looksTabular(text)) return `<pre class="calc-block">${escapeHtml(text)}</pre>`;
+  return `<div class="a-text">${escapeHtml(text)}</div>`;
+}
 function addQACard(row){
   const card = document.createElement('div');
   card.className = 'qa-card';
   const yearBit = row.year ? ` · ${escapeHtml(row.year)}` : '';
-  const answerHtml = looksTabular(row.answer)
-    ? `<pre class="calc-block">${escapeHtml(row.answer)}</pre>`
-    : `<div class="a-text">${escapeHtml(row.answer)}</div>`;
   card.innerHTML = `
     <div class="stamp">✓ found</div>
     <div class="code">${escapeHtml(row.courseCode)} · Q${escapeHtml(row.qNumber)}${yearBit}</div>
@@ -383,7 +426,7 @@ function addQACard(row){
     <div class="q-text">${escapeHtml(row.question)}</div>
     <hr>
     <div class="a-label">Answer</div>
-    ${answerHtml}
+    ${renderAnswerBlock(row.answer)}
   `;
   chatLog.appendChild(card);
   scrollDown();
