@@ -1,16 +1,14 @@
 Course Code,Course Title,Question Number,Question,Answer,Access,Exam Year
 MTH101,Linear Algebra,1,"Solve for x: 2x + 5 = 15","x = 5. Subtract 5 from both sides to get 2x = 10, then divide both sides by 2.",Free,2023
 MTH101,Linear Algebra,2,"Find the determinant of [[2,1],[3,4]]","det = (2*4) - (1*3) = 8 - 3 = 5",Paid,2023
-ACC201,Financial Accounting,1,"Prepare a trial balance from the following: Cash 50000, Capital 80000, Sales 120000, Purchases 90000, Rent 15000, Debtors 45000","Trial Balance as at 31 Dec
-Account          Debit      Credit
-Cash              50000
-Capital                      80000
-Sales                       120000
-Purchases         90000
-Rent              15000
-Debtors           45000
-                 -------    -------
-Total            200000     200000",Free,2022
+ACC201,Financial Accounting,1,"Prepare a trial balance from the following: Cash 50000, Capital 80000, Sales 120000, Purchases 90000, Rent 15000, Debtors 45000","Account | Debit | Credit
+Cash | 50000 |
+Capital | | 80000
+Sales | | 120000
+Purchases | 90000 |
+Rent | 15000 |
+Debtors | 45000 |
+Total | 200000 | 200000",Free,2022
 ACC201,Financial Accounting,2,"Explain the going concern concept in accounting","The going concern concept assumes that a business will continue operating for the foreseeable future, with no intention or need to liquidate. This underlies the use of historical cost accounting rather than valuing assets at what they would fetch if the business closed down immediately.",Free,2022
 CHM101,General Chemistry,1,"State the law of conservation of mass","Matter can neither be created nor destroyed in a chemical reaction; the mass of reactants equals the mass of products.",Free,2023
 CHM101,General Chemistry,2,"Balance the equation: H2 + O2 -> H2O","2H2 + O2 -> 2H2O",Paid,2023
