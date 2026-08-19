@@ -1,6 +1,6 @@
-const CACHE_NAME = 'past-questions-v1';
+const CACHE_NAME = 'past-questions-v2';
 const APP_SHELL = [
-  './past-questions-app.html',
+  './index.html',
   './manifest.json'
 ];
 
