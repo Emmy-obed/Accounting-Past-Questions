@@ -876,11 +876,25 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 
 installBtn.addEventListener('click', async () => {
-  if(deferredInstallPrompt){
+  if(!deferredInstallPrompt){
+    installBanner.querySelector('span').textContent = "Install isn't available right now — try your browser's menu (⋮) → \"Install app\" instead.";
+    installBtn.hidden = true;
+    return;
+  }
+  try{
     deferredInstallPrompt.prompt();
-    await deferredInstallPrompt.userChoice;
+    const choice = await deferredInstallPrompt.userChoice;
     deferredInstallPrompt = null;
-    installBanner.hidden = true;
+    if(choice.outcome === 'accepted'){
+      installBanner.hidden = true;
+    }else{
+      installBanner.querySelector('span').textContent = 'No problem — you can install any time from the browser menu (⋮) → "Install app".';
+      installBtn.hidden = true;
+    }
+  }catch(err){
+    installBanner.querySelector('span').textContent = "That didn't go through — try your browser's menu (⋮) → \"Install app\" instead.";
+    installBtn.hidden = true;
+    console.error('Install prompt failed:', err);
   }
 });
 
